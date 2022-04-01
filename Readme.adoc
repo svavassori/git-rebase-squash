@@ -1,0 +1,70 @@
+= Git rebase vs squash function and performance tests
+
+This repo contains some simple examples to understand the differences.
+
+You can have a general view of the repo with:
+
+```
+git log --graph --simplify-by-decoration --pretty=format:'%d' --all
+```
+
+== Conflict difference between rebase and squash
+
+There is a small difference between rebasing a branch with a list of small commits or squashing them into one and rebase the single resulting commit: squash usually reduces the information available to Git in order to apply state changes and thus, increasing the probability of a conflict.
+
+As an example, create a `long-branch-rebase` branch, then rebase on another: it should perform that without any conflicts.
+
+```
+git checkout short-branch
+git checkout long-branch
+git checkout -b long-branch-rebase
+git rebase short-branch
+```
+
+Now we create a copy of the original `long-branch`, then squash all commits and rebase the single commit.
+
+```
+git checkout long-branch
+git checkout -b long-branch-squash
+git rebase -i master
+# rewrite 'pick' to 's' in all but the first
+git rebase short-branch
+```
+
+You should get a `CONFLICT (modify/delete): shared-file deleted in xxxxxx`...
+
+
+== Rebase performance
+
+When performing a rebase, Git checks out the specified branch to rebase *onto* and, from that state, it will sequentially apply the commits of the local branch. This means the time to perform a rebase is proportional to the local branch and not to the one to rebase onto.
+
+As example of that we can measure the time to rebase `extremely-long-branch`, that has 10k commits onto `short-branch` and then doing the other way around.
+
+```
+git checkout extremely-long-branch
+git checkout -b extremely-long-branch-onto-short
+time git rebase short-branch
+```
+
+The output should look like this one.
+
+```
+real	0m18,172s
+user	0m5,086s
+sys	    0m12,724s
+```
+
+
+While doing the reverse, namely `short-branch` onto `extemely-long-branch` is faster since it has to apply only few commits:
+
+```
+git branch short-branch-onto-extremely-long extremely-long-branch
+git checkout short-branch
+time git rebase short-branch-onto-extremely-long
+```
+
+```
+real	0m0,186s
+user	0m0,138s
+sys	    0m0,047s
+```
